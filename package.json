@@ -1,0 +1,32 @@
+{
+  "name": "files",
+  "version": "1.0.0",
+  "description": "This sandbox has **no network access** and **no PostgreSQL installed**, so I could not run `npx prisma migrate dev` or `npx prisma validate` against a live database to give you tool-verified confirmation. What I did instead, so this isn't just unverified output:",
+  "main": "seed.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node src/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "bcrypt": "^6.0.0",
+    "bullmq": "^5.79.2",
+    "cors": "^2.8.6",
+    "csv-parse": "^7.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "node-qpdf2": "^6.0.0",
+    "pg": "^8.22.0",
+    "prisma": "^7.8.0",
+    "puppeteer": "^25.2.1",
+    "qrcode": "^1.5.4"
+  }
+}

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Payslip</title>
+<style>
+  @page { margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    color: #1a1a1a;
+    margin: 0;
+    padding: 32px 40px;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #1a3a5c;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+  .company-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a3a5c;
+    margin: 0 0 4px 0;
+  }
+  .company-tagline {
+    font-size: 10px;
+    color: #666;
+    margin: 0;
+  }
+  .doc-title {
+    text-align: right;
+  }
+  .doc-title h2 {
+    margin: 0;
+    font-size: 16px;
+    color: #1a3a5c;
+  }
+  .doc-title p {
+    margin: 2px 0 0 0;
+    font-size: 11px;
+    color: #555;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 24px;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: #f7f9fb;
+    border-radius: 4px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+  }
+  .info-label {
+    color: #666;
+  }
+  .info-value {
+    font-weight: 600;
+  }
+
+  .section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1a3a5c;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 18px 0 8px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #d8dee3;
+  }
+
+  table.line-items {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 4px;
+  }
+  table.line-items td {
+    padding: 5px 4px;
+    border-bottom: 1px solid #eef1f4;
+  }
+  table.line-items td.amount {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+  }
+  table.line-items tr.subtotal td {
+    font-weight: 700;
+    border-top: 1px solid #1a3a5c;
+    border-bottom: none;
+    padding-top: 8px;
+  }
+
+  .totals-box {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: #1a3a5c;
+    color: #fff;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .totals-box .label {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .totals-box .amount {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+  }
+
+  .signoff {
+    margin-top: 36px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .signoff .block {
+    text-align: center;
+    width: 220px;
+  }
+  .signoff .place-date {
+    font-size: 11px;
+    color: #555;
+    margin-bottom: 32px;
+  }
+  .signoff .line {
+    border-top: 1px solid #1a1a1a;
+    margin-top: 8px;
+    padding-top: 4px;
+    font-weight: 600;
+  }
+  .signoff .role {
+    font-size: 10px;
+    color: #666;
+  }
+
+  .qr-block {
+    margin-top: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid #d8dee3;
+  }
+  .qr-block img {
+    width: 64px;
+    height: 64px;
+  }
+  .qr-block .verify-text {
+    font-size: 9px;
+    color: #777;
+    line-height: 1.4;
+  }
+  .qr-block .verify-hash {
+    font-family: 'Courier New', monospace;
+    font-size: 9px;
+    color: #999;
+    word-break: break-all;
+  }
+
+  .footer {
+    margin-top: 28px;
+    padding-top: 12px;
+    border-top: 1px solid #d8dee3;
+    font-size: 9px;
+    color: #999;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <p class="company-name">{{companyName}}</p>
+      <p class="company-tagline">{{companyTagline}}</p>
+    </div>
+    <div class="doc-title">
+      <h2>SLIP GAJI / PAYSLIP</h2>
+      <p>Periode: {{periodLabel}}</p>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-row">
+      <span class="info-label">Nama Karyawan</span>
+      <span class="info-value">{{fullName}}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">No. Rekening</span>
+      <span class="info-value">{{bankAccountNo}}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Jabatan</span>
+      <span class="info-value">{{jobTitle}}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Status Karyawan</span>
+      <span class="info-value">{{employmentStatus}}</span>
+    </div>
+  </div>
+
+  <div class="section-title">Pendapatan / Earnings</div>
+  <table class="line-items">
+    <tr>
+      <td>Gaji Pokok (Basic Salary)</td>
+      <td class="amount">{{basicSalaryFormatted}}</td>
+    </tr>
+    {{earningRows}}
+    <tr class="subtotal">
+      <td>Total Pendapatan</td>
+      <td class="amount">{{totalEarningsFormatted}}</td>
+    </tr>
+  </table>
+
+  <div class="section-title">Potongan / Deductions</div>
+  <table class="line-items">
+    {{deductionRows}}
+    <tr class="subtotal">
+      <td>Total Potongan</td>
+      <td class="amount">{{totalDeductionsFormatted}}</td>
+    </tr>
+  </table>
+
+  <div class="totals-box">
+    <span class="label">Gaji Bersih / Net Pay</span>
+    <span class="amount">{{netPayFormatted}}</span>
+  </div>
+
+  <div class="signoff">
+    <div class="block">
+      <p class="place-date">{{issueLocation}}, {{issueDateFormatted}}</p>
+      <div class="line">{{authorizedSignatory}}</div>
+      <p class="role">Disahkan oleh</p>
+    </div>
+    <div class="block">
+      <p class="place-date">&nbsp;</p>
+      <div class="line">{{fullName}}</div>
+      <p class="role">Diterima oleh</p>
+    </div>
+  </div>
+
+  <div class="qr-block">
+    <img src="{{qrCodeDataUrl}}" alt="Verification QR" />
+    <div class="verify-text">
+      Pindai kode QR ini untuk memverifikasi keaslian dokumen.<br/>
+      Scan this QR code to verify document authenticity.<br/>
+      <span class="verify-hash">Verification ID: {{verificationHash}}</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    Dokumen ini dihasilkan secara elektronik dan sah tanpa tanda tangan basah.<br/>
+    This document is electronically generated and valid without a physical signature.
+  </div>
+
+</body>
+</html>

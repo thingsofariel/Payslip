@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Environment secrets -- NEVER commit real credentials/JWT secrets
+.env
+.env.local
+.env.*.local
+
+# Generated payslip PDFs (contain real payroll data)
+storage/payslip-pdfs/*
+!storage/payslip-pdfs/.gitkeep
+
+# Build output
+frontend/dist/
+dist/
+
+# Logs
+npm-debug.log*
+*.log
+
+# OS/editor cruft
+.DS_Store
+
+# Zip bundles created for transfer
+*.zip

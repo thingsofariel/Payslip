@@ -1,0 +1,223 @@
+// ============================================================
+// Payslip System — Prisma Schema
+// ============================================================
+// Run:
+//   npx prisma migrate dev --name init
+//   npx prisma generate
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------------
+// ENUMS
+// ------------------------------------------------------------
+
+enum EmploymentStatus {
+  PERMANENT
+  CONTRACT
+  FREELANCE
+  INTERN
+}
+
+enum UserRole {
+  ADMIN_HR
+  EMPLOYEE
+}
+
+enum PayslipStatus {
+  DRAFT
+  FINALIZED
+  SENT
+  ARCHIVED
+}
+
+// Distinguishes earning line-item types so the PDF template
+// and reports can group them (Basic Salary is its own column,
+// not a row here — see note on Payslip.basicSalary below).
+enum EarningCategory {
+  ALLOWANCE
+  BONUS
+  OVERTIME
+  INCENTIVE
+  OTHER
+}
+
+enum DeductionCategory {
+  BPJS_HEALTH
+  BPJS_PENSION
+  PPH21_TAX
+  ABSENCE_PENALTY
+  SALARY_ADVANCE
+  OTHER
+}
+
+// ------------------------------------------------------------
+// EMPLOYEE MASTER DATA
+// ------------------------------------------------------------
+
+model Employee {
+  employeeId       Int              @id @default(autoincrement()) @map("employee_id")
+
+  // --- Fields as per physical form ---
+  fullName         String           @map("full_name")
+  jobTitle         String           @map("job_title")
+  employmentStatus EmploymentStatus @default(PERMANENT) @map("employment_status")
+
+  // --- System additions (not on the paper form) ---
+  email            String           @unique
+  bankAccountNo    String           @map("bank_account_no")
+
+  // NIK / DOB are used to derive the PDF owner password (see deduction
+  // note in security review). Treat these as sensitive — encrypt at
+  // the application layer before persisting if your DB doesn't already
+  // enforce column-level encryption (e.g. pgcrypto).
+  nik              String?          @unique
+  dateOfBirth      DateTime?        @map("date_of_birth") @db.Date
+
+  // --- Portal auth ---
+  passwordHash     String           @map("password_hash")
+  role             UserRole         @default(EMPLOYEE)
+
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  payslips         Payslip[]
+  auditLogs        AuditLog[]       @relation("ActorAuditLogs")
+
+  @@map("employees")
+  @@index([email])
+}
+
+// ------------------------------------------------------------
+// PAYSLIP (header / calculation meta record)
+// ------------------------------------------------------------
+
+model Payslip {
+  payslipId           Int               @id @default(autoincrement()) @map("payslip_id")
+
+  employeeId           Int               @map("employee_id")
+  employee             Employee          @relation(fields: [employeeId], references: [employeeId], onDelete: Restrict)
+
+  // --- Payroll Period ---
+  periodMonth          Int               @map("period_month") // 1-12, validated in app layer + CHECK constraint
+  periodYear           Int               @map("period_year")
+
+  // --- Issue Date & Location ---
+  issueDate            DateTime          @map("issue_date") @db.Date
+  issueLocation         String           @default("Kupang") @map("issue_location")
+
+  // Basic Salary lives here, not in earning_details, because it's a
+  // single fixed value per payslip rather than a dynamic list item.
+  basicSalary           Decimal          @default(0) @map("basic_salary") @db.Decimal(14, 2)
+
+  // --- Cached calculation results ---
+  // These are NOT computed on every read. They are recalculated by the
+  // application service (or a DB trigger) whenever earning/deduction
+  // line items change, so reports and PDF renders stay cheap.
+  totalEarnings         Decimal          @default(0) @map("total_earnings") @db.Decimal(14, 2)
+  totalDeductions       Decimal          @default(0) @map("total_deductions") @db.Decimal(14, 2)
+  netPay                Decimal          @default(0) @map("net_pay") @db.Decimal(14, 2)
+
+  // --- Authorized Signatory ---
+  authorizedSignatory   String           @map("authorized_signatory")
+
+  status                PayslipStatus    @default(DRAFT)
+
+  // HMAC-SHA256 of (payslipId + netPay + issueDate + secret) — used to
+  // build the verification QR code. Never store raw payroll figures
+  // inside the QR payload itself; the QR should only carry a lookup
+  // token that resolves server-side.
+  verificationHash      String?          @map("verification_hash")
+
+  pdfPath               String?          @map("pdf_path")
+  pdfGeneratedAt         DateTime?        @map("pdf_generated_at")
+
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
+
+  earningDetails         EarningDetail[]
+  deductionDetails       DeductionDetail[]
+  auditLogs              AuditLog[]
+
+  // One payslip per employee per period — prevents accidental duplicate runs
+  @@unique([employeeId, periodMonth, periodYear], name: "uniq_employee_period")
+  @@index([employeeId, periodYear, periodMonth])
+  @@index([status])
+  @@map("payslips")
+}
+
+// ------------------------------------------------------------
+// EARNINGS — Category A (dynamic 1-to-N)
+// ------------------------------------------------------------
+
+model EarningDetail {
+  earningId    Int             @id @default(autoincrement()) @map("earning_id")
+
+  payslipId     Int             @map("payslip_id")
+  payslip       Payslip         @relation(fields: [payslipId], references: [payslipId], onDelete: Cascade)
+
+  // e.g. "Transport Allowance", "Meal Allowance", "Year-End Bonus"
+  label         String
+  category      EarningCategory @default(ALLOWANCE)
+
+  amount        Decimal         @db.Decimal(14, 2)
+  sortOrder     Int             @default(0) @map("sort_order")
+
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  @@index([payslipId])
+  @@map("earning_details")
+}
+
+// ------------------------------------------------------------
+// DEDUCTIONS — Category B (dynamic 1-to-N)
+// ------------------------------------------------------------
+
+model DeductionDetail {
+  deductionId  Int               @id @default(autoincrement()) @map("deduction_id")
+
+  payslipId     Int               @map("payslip_id")
+  payslip       Payslip           @relation(fields: [payslipId], references: [payslipId], onDelete: Cascade)
+
+  // e.g. "BPJS Kesehatan", "BPJS Pensiun", "PPh21", "Salary Advance"
+  label         String
+  category      DeductionCategory @default(OTHER)
+
+  amount        Decimal           @db.Decimal(14, 2)
+  sortOrder     Int               @default(0) @map("sort_order")
+
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  @@index([payslipId])
+  @@map("deduction_details")
+}
+
+// ------------------------------------------------------------
+// AUDIT LOG — not in the original spec, but payroll data needs
+// a trail of who created/modified/finalized each record.
+// ------------------------------------------------------------
+
+model AuditLog {
+  logId        Int       @id @default(autoincrement()) @map("log_id")
+
+  payslipId    Int?      @map("payslip_id")
+  payslip      Payslip?  @relation(fields: [payslipId], references: [payslipId], onDelete: SetNull)
+
+  actorId      Int       @map("actor_id")
+  actor        Employee  @relation("ActorAuditLogs", fields: [actorId], references: [employeeId])
+
+  action       String    // e.g. "CREATE", "UPDATE", "FINALIZE", "SEND_EMAIL", "DOWNLOAD_PDF"
+  detail       String?   // free-text or JSON-encoded diff
+
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([payslipId])
+  @@index([actorId])
+  @@map("audit_logs")
+}
