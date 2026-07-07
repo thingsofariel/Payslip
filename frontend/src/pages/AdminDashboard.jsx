@@ -473,7 +473,7 @@ const AdminDashboard = () => {
       {/* Header */}
       <header style={{ backgroundColor: '#0f294a', color: '#fff', padding: '16px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ fontSize: '18px', fontWeight: 'bold' }}>PT Contoh Sejahtera</div>
+          <div style={{ fontSize: '18px', fontWeight: 'bold' }}>FORTUNA ENGLISH GLOBAL LEARNING</div>
           <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>Panel Admin HR</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
