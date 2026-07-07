@@ -16,7 +16,6 @@ const path = require('path');
 const crypto = require('crypto');
 const puppeteer = require('puppeteer');
 const QRCode = require('qrcode');
-const { encrypt: qpdfEncrypt } = require('node-qpdf2');
 
 require('dotenv').config();
 
@@ -140,58 +139,15 @@ async function renderTemplate(payslip) {
 }
 
 /**
- * Generates a password to encrypt the PDF, derived from the employee's
- * date of birth and NIK (last 4 digits), per the original spec.
+ * Main entry point: generates a finished PDF for a payslip and writes it
+ * to disk. Returns the absolute file path.
  *
- * SECURITY NOTE (flagged in the original system design too): this is
- * weak protection in practice. An employee's DOB and NIK are not secret
- * -- NIK in particular is printed on the physical KTP and shared with
- * banks routinely. Treat this as a deterrent against casual snooping
- * of an email attachment, not real encryption. The actual access
- * control is the authenticated API endpoint in front of this file.
- */
-function derivePdfPassword(employee) {
-  if (!employee.dateOfBirth || !employee.nik) {
-    // Fall back to NIK-only or a fixed pattern if DOB isn't on file --
-    // but surface this clearly rather than silently producing a weak
-    // or empty password.
-    throw new Error(
-      `Cannot derive PDF password for employee ${employee.employeeId}: dateOfBirth and/or nik is missing.`
-    );
-  }
-  const dob = new Date(employee.dateOfBirth);
-  const ddmmyyyy =
-    String(dob.getDate()).padStart(2, '0') +
-    String(dob.getMonth() + 1).padStart(2, '0') +
-    dob.getFullYear();
-  const nikLast4 = employee.nik.slice(-4);
-  return `${ddmmyyyy}${nikLast4}`;
-}
-
-/**
- * Encrypts an existing PDF file with an owner password, using the
- * `qpdf` command-line tool under the hood via the node-qpdf2 wrapper.
- *
- * REQUIRES qpdf TO BE INSTALLED ON THE HOST -- this is a system package,
- * not something `npm install` provides on its own:
- *   Debian/Ubuntu: sudo apt install qpdf
- *   macOS:         brew install qpdf
- * `npm install node-qpdf2` only installs the JS wrapper; it shells out
- * to the real `qpdf` binary, which must already be on PATH.
- */
-async function encryptPdfWithPassword(inputPath, outputPath, ownerPassword) {
-  await qpdfEncrypt({
-    input: inputPath,
-    output: outputPath,
-    password: ownerPassword,
-    keyLength: 256,
-    restrictions: { useAes: 'y' },
-  });
-}
-
-/**
- * Main entry point: generates a finished, password-protected PDF for a
- * payslip and writes it to disk. Returns the absolute file path.
+ * NOTE: PDF owner-password encryption (via qpdf) was intentionally
+ * removed per business decision -- employees should be able to open
+ * their payslip directly from the dashboard without an extra password
+ * step. Access control is still enforced at the API layer (JWT auth +
+ * ownership check in pdfController.js): only the employee themselves,
+ * or an ADMIN_HR user, can even reach this file in the first place.
  *
  * `payslip` must be the fully-loaded Prisma record (with employee,
  * earningDetails, deductionDetails included).
@@ -203,7 +159,6 @@ async function generatePayslipPdf(payslip) {
 
   const { html, verificationHash } = await renderTemplate(payslip);
 
-  const unencryptedPath = path.join(STORAGE_DIR, `payslip-${payslip.payslipId}-raw.pdf`);
   const finalPath = path.join(STORAGE_DIR, `payslip-${payslip.payslipId}.pdf`);
 
   const browser = await puppeteer.launch({
@@ -220,7 +175,7 @@ async function generatePayslipPdf(payslip) {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
     await page.pdf({
-      path: unencryptedPath,
+      path: finalPath,
       format: 'A4',
       printBackground: true,
       margin: { top: '0', bottom: '0', left: '0', right: '0' },
@@ -229,18 +184,10 @@ async function generatePayslipPdf(payslip) {
     await browser.close();
   }
 
-  const password = derivePdfPassword(payslip.employee);
-  await encryptPdfWithPassword(unencryptedPath, finalPath, password);
-
-  // Remove the unencrypted intermediate file -- it should never persist
-  // on disk even briefly longer than necessary.
-  fs.unlinkSync(unencryptedPath);
-
   return { filePath: finalPath, verificationHash };
 }
 
 module.exports = {
   generatePayslipPdf,
   buildVerificationHash,
-  derivePdfPassword,
 };

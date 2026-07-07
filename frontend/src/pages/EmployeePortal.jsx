@@ -385,16 +385,13 @@ function PayslipDetailCard({ payslip, onDownload, downloadState }) {
               }}
             >
               <Download size={16} />
-              {downloadState === 'downloading' ? 'Mengunduh...' : 'Unduh PDF (Terenkripsi)'}
+              {downloadState === 'downloading' ? 'Mengunduh...' : 'Unduh PDF'}
             </button>
             {downloadState === 'error' && (
               <div style={{ textAlign: 'center', fontSize: 12, color: palette.rust, marginTop: 8 }}>
                 Gagal mengunduh PDF. Coba lagi.
               </div>
             )}
-            <div style={{ textAlign: 'center', fontSize: 11, color: palette.muted, marginTop: 8 }}>
-              Kata sandi: tanggal lahir + 4 digit NIK terakhir
-            </div>
           </>
         )}
       </div>
