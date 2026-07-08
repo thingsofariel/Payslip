@@ -1,5 +1,6 @@
 // src/controllers/payslipController.js
 
+const crypto = require('crypto');
 const prisma = require('../config/prisma');
 const { generatePayslipPdf } = require('../services/pdfService');
 
@@ -52,7 +53,7 @@ async function listPayslips(req, res) {
 /**
  * GET /api/payslips/:id
  * Same ownership rule as above, enforced per-record rather than via
- * a list filter — an employee cannot fetch someone else's payslip by
+ * a list filter -- an employee cannot fetch someone else's payslip by
  * guessing/incrementing the ID.
  */
 async function getPayslipById(req, res) {
@@ -76,7 +77,7 @@ async function getPayslipById(req, res) {
     const isAdmin = req.user.role === 'ADMIN_HR';
 
     if (!isOwner && !isAdmin) {
-      // 404, not 403 — don't reveal that a payslip with this ID exists
+      // 404, not 403 -- don't reveal that a payslip with this ID exists
       // at all to someone who has no right to see it.
       return res.status(404).json({ error: 'Payslip not found.' });
     }
@@ -92,7 +93,7 @@ async function getPayslipById(req, res) {
  * POST /api/payslips
  * ADMIN_HR only (enforced by route-level authorize() middleware).
  * Creates a payslip header plus its earning/deduction line items in
- * a single transaction — either all the data is written, or none of
+ * a single transaction -- either all the data is written, or none of
  * it is. The DB trigger (recalc_payslip_totals) fires automatically
  * once the line items are inserted, so we don't compute totals here.
  */
@@ -174,7 +175,7 @@ async function createPayslip(req, res) {
     return res.status(201).json({ payslip });
   } catch (err) {
     if (err.code === 'P2002') {
-      // Unique constraint violation — duplicate (employeeId, month, year)
+      // Unique constraint violation -- duplicate (employeeId, month, year)
       return res.status(409).json({
         error: 'A payslip for this employee and period already exists.',
       });
@@ -188,7 +189,7 @@ async function createPayslip(req, res) {
  * PATCH /api/payslips/:id/finalize
  * ADMIN_HR only. Transitions a payslip from DRAFT to FINALIZED.
  * This is the trigger point that will, in a future step, kick off the
- * PDF generation + mailer job — kept as a placeholder for now.
+ * PDF generation + mailer job -- kept as a placeholder for now.
  */
 async function finalizePayslip(req, res) {
   try {
@@ -298,10 +299,47 @@ async function markPayslipSent(req, res) {
   }
 }
 
+/**
+ * POST /api/payslips/:id/share-link
+ * ADMIN_HR only. Generates (or returns the existing) shareable link for
+ * this payslip's PDF, meant to be copy-pasted by HR into WhatsApp/email
+ * for that one employee. The link itself is just a lookup token -- real
+ * access control still happens in pdfController.js's canAccessPayslip()
+ * check, requiring the recipient to actually log in as either that
+ * payslip's own employee or ADMIN_HR.
+ */
+async function getOrCreateShareLink(req, res) {
+  try {
+    const payslipId = parseInt(req.params.id, 10);
+
+    const payslip = await prisma.payslip.findUnique({ where: { payslipId } });
+
+    if (!payslip) {
+      return res.status(404).json({ error: 'Payslip not found.' });
+    }
+
+    let { shareToken } = payslip;
+
+    if (!shareToken) {
+      shareToken = crypto.randomBytes(24).toString('hex');
+      await prisma.payslip.update({ where: { payslipId }, data: { shareToken } });
+    }
+
+    const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:5173';
+    const link = `${frontendBaseUrl}/slip/${shareToken}`;
+
+    return res.json({ link });
+  } catch (err) {
+    console.error('getOrCreateShareLink error:', err);
+    return res.status(500).json({ error: 'Failed to generate share link.' });
+  }
+}
+
 module.exports = {
   listPayslips,
   getPayslipById,
   createPayslip,
   finalizePayslip,
   markPayslipSent,
+  getOrCreateShareLink,
 };

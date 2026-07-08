@@ -137,6 +137,7 @@ model Payslip {
 
   pdfPath               String?          @map("pdf_path")
   pdfGeneratedAt         DateTime?        @map("pdf_generated_at")
+  shareToken             String?          @unique @map("share_token") // manager-shared PDF link token
 
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt              DateTime         @updatedAt @map("updated_at")

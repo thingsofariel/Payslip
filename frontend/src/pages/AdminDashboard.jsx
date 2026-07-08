@@ -44,6 +44,8 @@ const AdminDashboard = () => {
   const [payslipRowMessage, setPayslipRowMessage] = useState({ payslipId: null, type: '', text: '' });
   const [viewingId, setViewingId] = useState(null); // payslipId currently mid-download (disables its Lihat button)
   const [markingSentId, setMarkingSentId] = useState(null); // payslipId currently mid-mark-as-sent
+  const [linkingId, setLinkingId] = useState(null); // payslipId currently mid-share-link-generation
+  const [copiedId, setCopiedId] = useState(null); // payslipId whose link was just copied (shows "Tersalin!" briefly)
 
   // --- Create Payslip ("Buat Slip Gaji") modal state ---
   const [showPayslipModal, setShowPayslipModal] = useState(false);
@@ -385,6 +387,36 @@ const AdminDashboard = () => {
       setViewingId(null);
     }
   };
+  // Generate (or reuse) a shareable link for this payslip's PDF, copy
+  // it to the clipboard for HR to paste into WhatsApp. Access to the
+  // link itself is still fully gated server-side (own employee or
+  // ADMIN_HR only) -- this button just fetches/copies the URL.
+  const handleCopyLink = async (payslip) => {
+    setLinkingId(payslip.payslipId);
+    setPayslipRowMessage({ payslipId: null, type: '', text: '' });
+    try {
+      const res = await fetch(`http://localhost:3000/api/payslips/${payslip.payslipId}/share-link`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        try {
+          await navigator.clipboard.writeText(data.link);
+          setCopiedId(payslip.payslipId);
+          setTimeout(() => setCopiedId(null), 2000);
+        } catch (clipErr) {
+          window.prompt('Salin link ini secara manual:', data.link);
+        }
+      } else {
+        setPayslipRowMessage({ payslipId: payslip.payslipId, type: 'error', text: data.error || 'Gagal membuat link.' });
+      }
+    } catch (err) {
+      setPayslipRowMessage({ payslipId: payslip.payslipId, type: 'error', text: 'Tidak dapat terhubung ke server.' });
+    } finally {
+      setLinkingId(null);
+    }
+  };
 
   // Mark a finalized payslip as sent -- this is what turns on the
   // checklist mark in the directory, once HR has actually delivered the
@@ -658,6 +690,14 @@ const AdminDashboard = () => {
                               style={{ backgroundColor: '#fff', border: '1px solid #d1d5db', borderRadius: '6px', padding: '6px 12px', fontSize: '13px', fontWeight: '600', color: '#374151', cursor: viewingId === p.payslipId ? 'not-allowed' : 'pointer', marginRight: '8px', opacity: viewingId === p.payslipId ? 0.6 : 1 }}
                             >
                               {viewingId === p.payslipId ? 'Membuka...' : 'Lihat'}
+                            </button>
+                            <button
+                              onClick={() => handleCopyLink(p)}
+                              disabled={linkingId === p.payslipId}
+                              title="Salin link slip gaji untuk dikirim ke karyawan"
+                              style={{ backgroundColor: copiedId === p.payslipId ? '#f0fdf4' : '#fff', border: `1px solid ${copiedId === p.payslipId ? '#86efac' : '#d1d5db'}`, borderRadius: '6px', padding: '6px 12px', fontSize: '13px', fontWeight: '600', color: copiedId === p.payslipId ? '#15803d' : '#374151', cursor: linkingId === p.payslipId ? 'not-allowed' : 'pointer', marginRight: '8px', opacity: linkingId === p.payslipId ? 0.6 : 1 }}
+                            >
+                              {linkingId === p.payslipId ? 'Membuat...' : copiedId === p.payslipId ? '✓ Tersalin!' : 'Link'}
                             </button>
                             <button
                               onClick={() => handleMarkSent(p)}
