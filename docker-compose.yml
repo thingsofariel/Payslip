@@ -1,0 +1,26 @@
+services:
+  payslip-db:
+    image: postgres:16
+    container_name: payslip-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: payslip_user
+      POSTGRES_PASSWORD: changeme123
+      POSTGRES_DB: payslip_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - payslip_pgdata:/var/lib/postgresql/data
+
+  payslip-redis:
+    image: redis:7
+    container_name: payslip-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - payslip_redisdata:/data
+
+volumes:
+  payslip_pgdata:
+  payslip_redisdata:
