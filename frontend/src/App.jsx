@@ -4,12 +4,23 @@ import { useAuth } from './AuthContext';
 import LoginPage from './pages/LoginPage';
 import EmployeePortal from './pages/EmployeePortal';
 import AdminDashboard from './pages/AdminDashboard';
+import SharedPayslipView from './pages/SharedPayslipView';
 
 export default function App() {
   const { token, employee } = useAuth();
 
+  // Shareable payslip links look like /slip/<token> -- this is a deep
+  // link a manager pastes into WhatsApp, so it must survive straight
+  // through the login gate below rather than always landing on the
+  // dashboard/portal after auth.
+  const shareMatch = window.location.pathname.match(/^\/slip\/([a-f0-9]+)$/);
+
   if (!token || !employee) {
     return <LoginPage />;
+  }
+
+  if (shareMatch) {
+    return <SharedPayslipView shareToken={shareMatch[1]} />;
   }
 
   // Role comes from the verified JWT payload returned at login -- the

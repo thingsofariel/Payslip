@@ -10,8 +10,9 @@ const {
   createPayslip,
   finalizePayslip,
   markPayslipSent,
+  getOrCreateShareLink,
 } = require('../controllers/payslipController');
-const { downloadPayslipPdf } = require('../controllers/pdfController');
+const { downloadPayslipPdf, downloadPayslipPdfByShareToken } = require('../controllers/pdfController');
 const { bulkImportPayslips, getBulkImportStatus } = require('../controllers/bulkImportController');
 
 // In-memory storage -- the CSV is read directly from req.file.buffer in
@@ -32,10 +33,20 @@ router.get('/', listPayslips);
 router.get('/:id', getPayslipById);
 router.get('/:id/pdf', downloadPayslipPdf);
 
+// Shareable-link PDF route (what a manager-pasted WhatsApp link points
+// at). Still requires login -- the token only identifies which payslip,
+// ownership is still checked in pdfController.js. 3 path segments here
+// vs 2 for '/:id/pdf' above means there's no route-matching ambiguity,
+// same reasoning as the bulk-import routes below.
+router.get('/share/:token/pdf', downloadPayslipPdfByShareToken);
+
 // ADMIN_HR only -- creating and finalizing payroll entries.
 router.post('/', authorize('ADMIN_HR'), createPayslip);
 router.patch('/:id/finalize', authorize('ADMIN_HR'), finalizePayslip);
 router.patch('/:id/mark-sent', authorize('ADMIN_HR'), markPayslipSent);
+
+// ADMIN_HR only -- generates/returns the shareable link for a payslip.
+router.post('/:id/share-link', authorize('ADMIN_HR'), getOrCreateShareLink);
 
 // ADMIN_HR only -- bulk CSV import.
 // No route-ordering conflict with '/:id' above: Express matches by
